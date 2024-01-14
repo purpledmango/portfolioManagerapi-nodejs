@@ -3,23 +3,32 @@ import bcrypt from "bcryptjs"
 import UserModel from "../models/userM.js";
 import LeadModel from "../models/leadsM.js";
 
+// POST - Login
 export const loginController = async (req, res) => {
 	try {
-
 		const { username, password } = req.body;
 
+		//Validate the client Input
 		if (!username || !password) {
-			res.status(401).json({ message: "Please Enter all the Fields" })
+			return res.status(403).json({ message: "Please Enter all the Fields" });
 		}
 
+		//If the session already exists then return the User with "Already Logged in"
 		if (req.session.user) {
-			const userDetails = await UserModel.findOne({ username: req.session.user.username });
-			return res.status(200).json({ message: "Already Logged In", ...userDetails._doc });
+			const userDetails = await UserModel.findOne({ username: req.session.user });
+			//return status 
+			return res.status(403).json({ message: "Already Logged In", ...userDetails._doc });
 		}
 
-
+		//Check the user from the DB
 		const userExist = await UserModel.findOne({ username: username });
 
+		//Return Messsage, User not Found
+		if (!userExist) {
+			return res.status(401).json({ message: "User not found" });
+		}
+
+		//Compaere the client password with the stored Hash and store the promises if authenticated
 		const authenticated = await bcrypt.compare(password, userExist.passwordHash);
 
 		if (!authenticated) {
@@ -27,20 +36,40 @@ export const loginController = async (req, res) => {
 		}
 
 		// Set session user
-		req.session.user = { authenticated: true, ...userExist._doc };
+		req.session.user = { email: userExist.email, user: userExist.username, name: userExist.name };
 
-		res.status(200).json({ message: "Login Successful", data: userExist._doc });
+		res.status(200).json({ message: "Login Successful", data: { email: userExist.email, username: userExist.username, name: userExist.name } });
 
 	} catch (error) {
-		console.log(error);
-		res.status(500).json({ message: "Internal Server Error" });
+		console.error(error);
+		res.status(502).json({ message: "Internal Server Error" });
 	}
 };
+
+// GET - Logout
+export const logoutController = async (req, res) => {
+	try {
+		if (req.session.user) {
+			const logggedOut = await req.session.destroy()
+			res.clearCookie('connect.sid');
+			return res.status(200).json({ message: "Log Out Successfully" })
+		}
+		else {
+			return res.status(401).json({ message: "Not Logged in" })
+		}
+
+	} catch (error) {
+		return res.send("Internal Server Error", error)
+	}
+}
+
 
 export const signupController = async (req, res) => {
 	try {
 
 		const { username, password, repeatPassword, name } = req.body
+
+		//Validate the Client Details
 		if (!username || !password || !repeatPassword || !name) {
 
 			return res.status(401).json({ message: "Please enter the all the details" })
@@ -50,6 +79,7 @@ export const signupController = async (req, res) => {
 			return res.status(401).json({ message: "Passwords do not match" })
 		}
 
+		//Verify is username already Exists in DB
 		const userExist = await UserModel.findOne({ username: username })
 
 		if (userExist) {
@@ -100,22 +130,6 @@ export const updateUserController = async (req, res) => {
 	}
 };
 
-
-// GET - logout
-export const logoutController = async (req, res) => {
-	try {
-		if (req.session.user) {
-			const logggedOut = await req.session.destroy()
-			return res.status(200).json({ message: "Logged Out Successfully" })
-		}
-		else {
-			return res.status(403).json({ message: "You need to be logged in to Log out" })
-		}
-
-	} catch (error) {
-		return res.send("Internal Server Error", error)
-	}
-}
 
 
 //DELTE - Deletes a user

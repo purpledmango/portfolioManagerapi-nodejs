@@ -1,10 +1,10 @@
 import { Router } from "express";
-import multer, { diskStorage } from "multer";
+import multer from "multer";
 import { addDesign, getDesign, updateDesign, deleteDesign } from "../controllers/designControllers.js";
 
 const router = Router();
 
-const storage = diskStorage({
+const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, "uploads/");
     },
